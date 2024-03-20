@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "acjs.fullname" . }}
+  labels:
+    {{- include "acjs.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "acjs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "acjs.selectorLabels" . | nindent 8 }}
+    spec:
+      volumes:
+        - name: tls-layer
+          secret:
+            secretName: {{ include "acjs.fullname" . }}-secret
+        - name: config
+          configMap:
+            name: {{ include "acjs.fullname" . }}-config
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "-config-file"
+            - /etc/acjs/config.yaml
+          ports:
+            - name: acjs-listener
+              containerPort: 8443
+              protocol: TCP
+          volumeMounts:
+            - name: tls-layer
+              readOnly: true
+              mountPath: "/etc/acjs-tls"
+            - name: config
+              readOnly: true
+              mountPath: "/etc/acjs"

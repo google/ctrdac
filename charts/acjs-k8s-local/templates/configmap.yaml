@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "acjs.fullname" . }}-config
+  labels:
+    {{- include "acjs.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    listener:
+      tls:
+        privateKeyPath: "/etc/acjs-tls/acjs.key"
+        certificatePath: "/etc/acjs-tls/acjs.crt"
+        listenOn: ":8443"
+    policies:
+      {{- .Values.policies | toYaml | nindent 6 }}

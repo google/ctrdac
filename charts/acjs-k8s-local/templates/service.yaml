@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "acjs.fullname" . }}-svc
+  labels:
+    {{- include "acjs.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8443
+      protocol: TCP
+      name: acjs-listener
+  selector:
+    {{- include "acjs.selectorLabels" . | nindent 4 }}
