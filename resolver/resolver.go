@@ -54,8 +54,8 @@ func New(dockerSocket string) Resolver {
 	return Resolver{&client}
 }
 
-// Resolve resolves a docker container ID into its RepoDigest(s)
-// Shortcut to calling ResolveContainer + ResolveImage
+// Resolve resolves a docker container ID into its RepoDigest or RepoTag.
+// Shortcut to calling ResolveContainer + ResolveImage along with some fallback logic.
 func (r Resolver) Resolve(containerID string) (string, error) {
 	a, e := r.ResolveContainer(containerID)
 	if e != nil {
@@ -66,7 +66,9 @@ func (r Resolver) Resolve(containerID string) (string, error) {
 		return "", e
 	}
 	if len(as) < 1 {
-		return "", fmt.Errorf("unexpected number of RepoDigests: %d", len(as))
+		// We were unable to obtain more info about the image, let's fall back to the Image reference
+		// coming from the container info.
+		return a, nil
 	}
 	return as[0], nil
 }
@@ -109,7 +111,8 @@ func (r Resolver) ResolveContainer(containerID string) (string, error) {
 	return "", nil
 }
 
-// ResolveImage resolves a docker image name (e.g. "alpine:latest") into its RepoDigest(s)
+// ResolveImage resolves a docker image name (e.g. "alpine:latest") into its
+// RepoDigest(s)/RepoTag(s).
 func (r Resolver) ResolveImage(imageName string) ([]string, error) {
 
 	uri := fmt.Sprintf("http://unix/"+dockerAPIVersion+"/images/%s/json", url.QueryEscape(imageName))
@@ -134,13 +137,18 @@ func (r Resolver) ResolveImage(imageName string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("field RepoDigests has invalid Type: %T", rd)
 	}
+	rt := props["RepoTags"]
+	repoTags, ok := rt.([]any)
+	if !ok {
+		return nil, fmt.Errorf("field RepoTags has invalid Type: %T", rd)
+	}
 
 	var re []string
 
-	for _, rde := range repoDigests {
+	for _, rde := range append(repoDigests, repoTags...) {
 		rdv, ok := rde.(string)
 		if !ok {
-			return nil, fmt.Errorf("entry in RepoDigests has invalid Type: %T", rde)
+			return nil, fmt.Errorf("entry %+v has invalid Type: %T", rde, rde)
 		}
 		re = append(re, rdv)
 	}

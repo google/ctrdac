@@ -22,10 +22,16 @@ import (
 	"testing"
 )
 
-type mockedGetter struct{}
+type mockedGetter struct {
+	containerResponse string
+	imageResponse     string
+}
 
-var dockerResponses = map[string]string{
-	"http://unix/v1.41/containers/json?all=1": `[  {
+const (
+	bothRepoDigestsAndTags = `{"Id":"sha256:042a816809aac8d0f7d7cacac7965782ee2ecac3f21bcf9f24b1de1a7387b769","RepoTags":["alpine:latest"],"RepoDigests":["alpine@sha256:f271e74b17ced29b915d351685fd4644785c6d1559dd1f2d4189a5e851ef753a"],"Parent":"","Comment":"","Created":"2023-01-09T17:05:20.656498283Z","Container":"d4d39cab50d7e505e946044f9131e99602e21f02d0137599e85a70c0b2b7cd15","ContainerConfig":{"Hostname":"d4d39cab50d7","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"DockerVersion":"20.10.12","Author":"","Config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"Architecture":"amd64","Os":"linux","Size":7049701,"VirtualSize":7049701,"GraphDriver":{"Data":{"MergedDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/merged","UpperDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/diff","WorkDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/work"},"Name":"overlay2"},"RootFS":{"Type":"layers","Layers":["sha256:8e012198eea15b2554b07014081c85fec4967a1b9cc4b65bd9a4bce3ae1c0c88"]},"Metadata":{"LastTagTime":"0001-01-01T00:00:00Z"}}`
+	repoTagsOnly           = `{"Id":"sha256:042a816809aac8d0f7d7cacac7965782ee2ecac3f21bcf9f24b1de1a7387b769","RepoTags":["alpine:latest"],"RepoDigests":[],"Parent":"","Comment":"","Created":"2023-01-09T17:05:20.656498283Z","Container":"d4d39cab50d7e505e946044f9131e99602e21f02d0137599e85a70c0b2b7cd15","ContainerConfig":{"Hostname":"d4d39cab50d7","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"DockerVersion":"20.10.12","Author":"","Config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"Architecture":"amd64","Os":"linux","Size":7049701,"VirtualSize":7049701,"GraphDriver":{"Data":{"MergedDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/merged","UpperDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/diff","WorkDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/work"},"Name":"overlay2"},"RootFS":{"Type":"layers","Layers":["sha256:8e012198eea15b2554b07014081c85fec4967a1b9cc4b65bd9a4bce3ae1c0c88"]},"Metadata":{"LastTagTime":"0001-01-01T00:00:00Z"}}`
+	noRepoDigestsNoTags    = `{"Id":"sha256:042a816809aac8d0f7d7cacac7965782ee2ecac3f21bcf9f24b1de1a7387b769","RepoTags":[],"RepoDigests":[],"Parent":"","Comment":"","Created":"2023-01-09T17:05:20.656498283Z","Container":"d4d39cab50d7e505e946044f9131e99602e21f02d0137599e85a70c0b2b7cd15","ContainerConfig":{"Hostname":"d4d39cab50d7","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"DockerVersion":"20.10.12","Author":"","Config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"Architecture":"amd64","Os":"linux","Size":7049701,"VirtualSize":7049701,"GraphDriver":{"Data":{"MergedDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/merged","UpperDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/diff","WorkDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/work"},"Name":"overlay2"},"RootFS":{"Type":"layers","Layers":["sha256:8e012198eea15b2554b07014081c85fec4967a1b9cc4b65bd9a4bce3ae1c0c88"]},"Metadata":{"LastTagTime":"0001-01-01T00:00:00Z"}}`
+	containerResponse      = `[  {
     "Id": "deadbeef",
     "Names": [
       "/sweet_jemison"
@@ -61,12 +67,17 @@ var dockerResponses = map[string]string{
     },
     "Mounts": []
   }
-]`,
-	"http://unix/v1.41/images/alpine/json": `{"Id":"sha256:042a816809aac8d0f7d7cacac7965782ee2ecac3f21bcf9f24b1de1a7387b769","RepoTags":["alpine:latest"],"RepoDigests":["alpine@sha256:f271e74b17ced29b915d351685fd4644785c6d1559dd1f2d4189a5e851ef753a"],"Parent":"","Comment":"","Created":"2023-01-09T17:05:20.656498283Z","Container":"d4d39cab50d7e505e946044f9131e99602e21f02d0137599e85a70c0b2b7cd15","ContainerConfig":{"Hostname":"d4d39cab50d7","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"DockerVersion":"20.10.12","Author":"","Config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"Image":"sha256:7fdd9d695f58803dd6ee7b1b8135122acedeb3817964d644b65995698b438002","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"Architecture":"amd64","Os":"linux","Size":7049701,"VirtualSize":7049701,"GraphDriver":{"Data":{"MergedDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/merged","UpperDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/diff","WorkDir":"/usr/local/google/docker/overlay2/c01d8f2efac13ee747c44841b2fb627baf76e691d5aa443b70382be6b195cf9f/work"},"Name":"overlay2"},"RootFS":{"Type":"layers","Layers":["sha256:8e012198eea15b2554b07014081c85fec4967a1b9cc4b65bd9a4bce3ae1c0c88"]},"Metadata":{"LastTagTime":"0001-01-01T00:00:00Z"}}`,
-}
+]`
+)
 
 func (m mockedGetter) Get(url string) (*http.Response, error) {
-	resp := dockerResponses[url]
+	resp := ""
+	switch url {
+	case "http://unix/v1.41/containers/json?all=1":
+		resp = m.containerResponse
+	case "http://unix/v1.41/images/alpine/json":
+		resp = m.imageResponse
+	}
 
 	if resp == "" {
 		return nil, fmt.Errorf("unknown url: %v", url)
@@ -75,15 +86,44 @@ func (m mockedGetter) Get(url string) (*http.Response, error) {
 }
 
 func TestResolver(t *testing.T) {
-	mockedGetter := mockedGetter{}
-	expectedImageID := "alpine@sha256:f271e74b17ced29b915d351685fd4644785c6d1559dd1f2d4189a5e851ef753a"
-	containerID := "deadbeef"
-	resolver := Resolver{client: mockedGetter}
-	id, err := resolver.Resolve(containerID)
-	if err != nil {
-		t.Fatal(err)
+	type TestCase struct {
+		name              string
+		containerResponse string
+		imageResponse     string
+		expectedImageID   string
 	}
-	if id != expectedImageID {
-		t.Errorf("expected image ID: %v, got instead: %v", expectedImageID, id)
+	testcases := []TestCase{
+		{
+			name:              "bothRepoDigestsAndTags",
+			containerResponse: containerResponse,
+			imageResponse:     bothRepoDigestsAndTags,
+			expectedImageID:   "alpine@sha256:f271e74b17ced29b915d351685fd4644785c6d1559dd1f2d4189a5e851ef753a",
+		},
+		{
+			name:              "repoTagsOnly",
+			containerResponse: containerResponse,
+			imageResponse:     repoTagsOnly,
+			expectedImageID:   "alpine:latest",
+		},
+		{
+			name:              "noRepoDigestsNoTags",
+			containerResponse: containerResponse,
+			imageResponse:     noRepoDigestsNoTags,
+			expectedImageID:   "alpine",
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockedGetter := mockedGetter{tc.containerResponse, tc.imageResponse}
+			containerID := "deadbeef"
+			resolver := Resolver{client: mockedGetter}
+			id, err := resolver.Resolve(containerID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if id != tc.expectedImageID {
+				t.Errorf("expected image ID: %v, got instead: %v", tc.expectedImageID, id)
+			}
+		})
 	}
 }
